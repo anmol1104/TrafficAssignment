@@ -1,8 +1,7 @@
 # TrafficAssignment
 improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm for static multi-class traffic assignment problem with generalized link cost function.
 
-
-Generalized link cost function
+    Generalized link cost function
     c(v) = Σ ℿₚ * p(v) * t
         c(v) - generalized link cost for link ij
         t    - travel time on link ij
