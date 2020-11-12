@@ -8,7 +8,7 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
     -   ℿₚ  : cost of parameter p
     -   p(v): parameter p as a polynomial function of v
 
-    Properties of the generalized cost function
+    Required properties of the generalized cost function
     -   Strictly positive
     -   Monotonically non-decreasing
     -   Continuously differentiable
