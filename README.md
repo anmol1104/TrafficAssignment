@@ -15,13 +15,13 @@ Properties of the generalized cost function
   -   COntinuously differentiable
 
 Arguments
-  -   networkName: network from the repository https://github.com/
+  -   networkName: network from the repository https://github.com/anmol1104/TrafficAssignment
   -   tol: tolerance level for relative gap convergence
   -   maxIters: maximum number of iterations
   -   maxRunTime: maximum wall clock run time
   -   log: presents results for every iteration if log is on
 
-DataFiles (available at: https://github.com/)
+DataFiles (available at: https://github.com/anmol1104/TrafficAssignment)
   -   cost: Enlists cost (ℿₚ) for all the parameters (p) of the generalized cost function
   -   coef: Enlists coefficients of p(v) for all the parameters (p) of the generalized cost function
   -   class: Enlists the relevant subset of parameters for the generalized cost function for each class
