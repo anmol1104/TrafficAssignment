@@ -30,8 +30,8 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
     IO Units
     -   length  : miles
     -   time    : hour
-    -   volume  : litre
-    -   mass    : kg
+    -   volume  : litre (of fuel)
+    -   mass    : kg (of emissions)
     -   cost    : $
 
     For more details on the iTAPAS algorithm refer to:
