@@ -35,5 +35,5 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
 -   cost    : $
 
 For more details on the iTAPAS algorithm refer to:
-    Bar-Gera, H., 2010. Traffic assignment by paired alternative segments. Transp. Res. Part B Methodological 44, 1022-1046.
-    Xie, J., Xie, C., 2016. New insights and improvements of using paired alternative segments for traffic assignment. Transp. Res. Part B Methodological 93, 406-424.
+-   Bar-Gera, H., 2010. Traffic assignment by paired alternative segments. Transp. Res. Part B Methodological 44, 1022-1046.
+-   Xie, J., Xie, C., 2016. New insights and improvements of using paired alternative segments for traffic assignment. Transp. Res. Part B Methodological 93, 406-424.
