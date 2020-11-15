@@ -69,20 +69,20 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
 
     function build()
         # cost file
-        costFile = "Network\\$networkName\\cost.csv"
+        costFile = "src\\Network\\$networkName\\cost.csv"
         csv₁ = CSV.File(costFile, types=[String, Float64])
         df₁ = DataFrame(csv₁)
         parameters = [df₁[i,1] for i in 1:nrow(df₁)]::Array{String,1}
         ℿ = df₁[!,2]::Array{Float64,1}
 
         # coef file
-        coefFile = "Network\\$networkName\\coef.csv"
+        coefFile = "src\\Network\\$networkName\\coef.csv"
         csv₂ = CSV.File(coefFile)
         df₂ = DataFrame(csv₂)
         γ = [[df₂[i,j] for j in 2:ncol(df₂)] for i in 1:length(parameters)]::Array{Array{Float64,1},1}
 
         # criteria file
-        clssFile = "Network\\$networkName\\class.csv"
+        clssFile = "src\\Network\\$networkName\\class.csv"
         csv₃ = CSV.File(clssFile, types=[Int64, String])
         df₃ = DataFrame(csv₃)
         criteria = [split(df₃[!,2][i], ", ") for i in 1:nrow(df₃)]::Array{Array{SubString{String},1},1}
@@ -99,7 +99,7 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         end
 
         # network file
-        ntwkFile = "Network\\$networkName\\network.csv"
+        ntwkFile = "src\\Network\\$networkName\\network.csv"
         csv₄ = CSV.File(ntwkFile, types=[Int64, Int64, Float64, Float64, Float64, Float64, Float64])
         df₄ = DataFrame(csv₄)
         head = df₄[!, 1]::Array{Int64,1}
@@ -131,7 +131,7 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         end
 
         # demand file
-        dmndFile = "Network\\$networkName\\demand.csv"
+        dmndFile = "src\\Network\\$networkName\\demand.csv"
         csv₅ = CSV.File(dmndFile)
         df₅ = DataFrame(csv₅)
         origin = df₅[!, 1]::Array{Int64,1}
