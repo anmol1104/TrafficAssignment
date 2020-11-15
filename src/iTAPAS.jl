@@ -137,30 +137,30 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         origin = df₅[!, 1]::Array{Int64,1}
         destination = df₅[!, 2]::Array{Int64,1}
         flows = df₅[!, 3:ncol(df₅)]::DataFrame
+        dict = Dict{Int64,Array{Int64,1}}(r => [r] for r in unique(origin))
+        for rₒ in unique(origin)
+            for m in 2:length(M)
+                r = length(N) + 1
+                append!(N, r)
+                append!(A[rₒ], r), push!(A, [rₒ])
+                append!(Vᵢⱼ[rₒ], 1.0), push!(Vᵢⱼ, [1.0])
+                append!(dᵢⱼ[rₒ], 0.0), push!(dᵢⱼ, [0.0])
+                append!(tᵢⱼ[rₒ], 0.001), push!(tᵢⱼ, [0.001])
+                append!(αᵢⱼ[rₒ], 0.0), push!(αᵢⱼ, [0.0])
+                append!(βᵢⱼ[rₒ], 0.0), push!(βᵢⱼ, [0.0])
+                append!(ϕ[rₒ], 0), push!(ϕ, [0])
+                append!(dict[rₒ], r)
+            end
+        end
         for i in 1:nrow(df₅)
             rₒ = origin[i]
             for j in 1:(ncol(df₅)-2)
-                if j == 1 r = origin[i]
-                else r = length(N) + 1 end
-                s = destination[i]
-                m = j
+                r, s, m = dict[rₒ][j], destination[i], j
                 if r ∉ R Sᵣ[r] = [] end
                 if r ∉ R append!(R, r) end
                 append!(Sᵣ[r], s)
                 Mᵣ[r] = m
                 qᵣ[(r,s)] = flows[i,j]
-                if j > 1
-                    if r ∉ N
-                        append!(N, r)
-                        append!(A[rₒ], r), push!(A, [rₒ])
-                        append!(Vᵢⱼ[rₒ], 1.0), push!(Vᵢⱼ, [1.0])
-                        append!(dᵢⱼ[rₒ], 0.0), push!(dᵢⱼ, [0.0])
-                        append!(tᵢⱼ[rₒ], 0.001), push!(tᵢⱼ, [0.001])
-                        append!(αᵢⱼ[rₒ], 0.0), push!(αᵢⱼ, [0.0])
-                        append!(βᵢⱼ[rₒ], 0.0), push!(βᵢⱼ, [0.0])
-                        append!(ϕ[rₒ], 0), push!(ϕ, [0])
-                    end
-                end
             end
         end
     end
