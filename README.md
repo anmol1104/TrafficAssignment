@@ -26,7 +26,7 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
 -   class   : Enlists the relevant subset of parameters for the generalized cost function for each class
 -   network : Details the topology of the network
 -   demand  : Enlists OD pairs and corresponding deman
-\n
+
 **IO Units**
 -   length  : miles
 -   time    : hour
