@@ -8,7 +8,7 @@ using Dates
 Random.seed!(1403)
 
 @doc "
-    traffic_assignment(;networkName, tol=1e-5, maxIters=20, log=:on)
+    traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
 
     improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm
     for static multi-class traffic assignment problem with generalized link cost
