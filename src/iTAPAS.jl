@@ -140,7 +140,10 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         for i in 1:nrow(df₅)
             rₒ = origin[i]
             for j in 1:(ncol(df₅)-2)
-                r, s, m = origin[i] + n*(j-1), destination[i], j
+                if j == 1 r = origin[i]
+                else r = length(N) + 1 end
+                s = destination[i]
+                m = j
                 if r ∉ R Sᵣ[r] = [] end
                 if r ∉ R append!(R, r) end
                 append!(Sᵣ[r], s)
