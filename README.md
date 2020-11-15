@@ -20,20 +20,19 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
 -   maxRunTime  : maximum wall clock run time
 -   log         : presents results for every iteration if log is on
 
-**DataFiles (available at: https://github.com/anmol1104/TrafficAssignment/tree/main/src/Network)**
+**DataFiles** (available at: https://github.com/anmol1104/TrafficAssignment/tree/main/src/Network)
 -   cost    : Enlists cost (ℿₚ) for all the parameters (p) of the generalized cost function
 -   coef    : Enlists coefficients of p(v) for all the parameters (p) of the generalized cost function
 -   class   : Enlists the relevant subset of parameters for the generalized cost function for each class
 -   network : Details the topology of the network
 -   demand  : Enlists OD pairs and corresponding deman
-
-
+\n
 **IO Units**
-    -   length  : miles
-    -   time    : hour
-    -   volume  : litre (of fuel)
-    -   mass    : kg (of emissions)
-    -   cost    : $
+-   length  : miles
+-   time    : hour
+-   volume  : litre (of fuel)
+-   mass    : kg (of emissions)
+-   cost    : $
 
 For more details on the iTAPAS algorithm refer to:
     - Bar-Gera, H., 2010. Traffic assignment by paired alternative segments. Transp. Res. Part B Methodological 44, 1022-1046.
