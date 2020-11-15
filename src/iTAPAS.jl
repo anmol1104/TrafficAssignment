@@ -30,7 +30,7 @@ Random.seed!(1403)
     -   networkName : network from the repository https://github.com/anmol1104/TrafficAssignment
     -   tol         : tolerance level for relative gap convergence
     -   maxIters    : maximum number of iterations
-    -   maxRunTime  : maximum wall clock run time
+    -   maxRunTime  : maximum wall clock run time (s)
     -   log         : presents results for every iteration if log is on
 
     ## DataFiles (available at: https://github.com/anmol1104/TrafficAssignment)
