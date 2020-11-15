@@ -14,7 +14,7 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
 -   Continuously differentiable
 
 **Arguments**
--   networkName : network from the repository https://github.com/anmol1104/TrafficAssignment/tree/main/src/Network
+-   networkName : network
 -   tol         : tolerance level for relative gap convergence
 -   maxIters    : maximum number of iterations
 -   maxRunTime  : maximum wall clock run time
