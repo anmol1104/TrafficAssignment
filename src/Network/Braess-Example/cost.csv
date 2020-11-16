@@ -1,7 +1,7 @@
 parameter,cost
-distance,0.482
-time,35
-energy,1.051
+D,0.482
+T,35
+FC,1.051
 CH4,1.781
 CO,0.199
 CO2,0.068
