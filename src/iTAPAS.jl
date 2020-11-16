@@ -8,7 +8,7 @@ using Dates
 Random.seed!(1403)
 
 @doc "
-    traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
+    traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
 
     improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm
     for static multi-class traffic assignment problem with generalized link cost
@@ -28,6 +28,7 @@ Random.seed!(1403)
 
     ## Arguments
     -   networkName : network from the repository https://github.com/anmol1104/TrafficAssignment
+    -   assignment  : User Equilibrium (UE) or System Optimal (SO) assigment
     -   tol         : tolerance level for relative gap convergence
     -   maxIters    : maximum number of iterations
     -   maxRunTime  : maximum wall clock run time (s)
@@ -38,7 +39,7 @@ Random.seed!(1403)
     -   coef    : Enlists coefficients of p(v) for all the parameters (p) of the generalized cost function
     -   class   : Enlists the relevant subset of parameters for the generalized cost function for each class
     -   network : Details the topology of the network
-    -   demand  : Enlists OD pairs and corresponding demand
+    -   demand  : Enlists OD pairs and corresponding demand for each class in PCE
 
     ## IO Units
     -   length  : miles
@@ -47,7 +48,7 @@ Random.seed!(1403)
     -   mass    : kg
     -   cost    : \$
 "
-function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
+function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
     println()
     printstyled("\niTAPAS Algorithm", color=:blue)
 
@@ -69,20 +70,20 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
 
     function build()
         # cost file
-        costFile = "src\\Network\\$networkName\\cost.csv"
+        costFile = "Network\\$networkName\\cost.csv"
         csv₁ = CSV.File(costFile, types=[String, Float64])
         df₁ = DataFrame(csv₁)
         parameters = [df₁[i,1] for i in 1:nrow(df₁)]::Array{String,1}
         ℿ = df₁[!,2]::Array{Float64,1}
 
         # coef file
-        coefFile = "src\\Network\\$networkName\\coef.csv"
+        coefFile = "Network\\$networkName\\coef.csv"
         csv₂ = CSV.File(coefFile)
         df₂ = DataFrame(csv₂)
         γ = [[df₂[i,j] for j in 2:ncol(df₂)] for i in 1:length(parameters)]::Array{Array{Float64,1},1}
 
         # criteria file
-        clssFile = "src\\Network\\$networkName\\class.csv"
+        clssFile = "Network\\$networkName\\class.csv"
         csv₃ = CSV.File(clssFile, types=[Int64, String])
         df₃ = DataFrame(csv₃)
         criteria = [split(df₃[!,2][i], ", ") for i in 1:nrow(df₃)]::Array{Array{SubString{String},1},1}
@@ -99,7 +100,7 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         end
 
         # network file
-        ntwkFile = "src\\Network\\$networkName\\network.csv"
+        ntwkFile = "Network\\$networkName\\network.csv"
         csv₄ = CSV.File(ntwkFile, types=[Int64, Int64, Float64, Float64, Float64, Float64, Float64])
         df₄ = DataFrame(csv₄)
         head = df₄[!, 1]::Array{Int64,1}
@@ -131,7 +132,7 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         end
 
         # demand file
-        dmndFile = "src\\Network\\$networkName\\demand.csv"
+        dmndFile = "Network\\$networkName\\demand.csv"
         csv₅ = CSV.File(dmndFile)
         df₅ = DataFrame(csv₅)
         origin = df₅[!, 1]::Array{Int64,1}
@@ -166,7 +167,7 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
     end
 
     # Returns cost of arc (i,j) for class m given arc flow x (k = A[i]⁻¹(j))
-    function cᵢⱼ(i, k, m, x)
+    function cᵢⱼ(i, k, m, x, method=assignment)
         #j = A[i][k]
 
         α = αᵢⱼ[i][k]
@@ -180,12 +181,18 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         if v == Inf v = 1.0e6 end
 
         c = 0.0
-        for k in 1:length(η[m]) c += η[m][k] * v^(length(η[m]) - k) * t end
+        if method == :UE for k in 0:(length(η[m])-1) c += η[m][k+1] * v^k * t end end
+        if method == :SO
+            t′ = tₒ * α * β * (abs(x) ^ (β - 1))/(V ^ β)
+            if β == 0 t′ = 0.0 end
+            if t′ == Inf t′ = 1.0e6 end
+            for k in 0:(length(η[m])-1) c += η[m][k+1] * v^k * (t + x * t′ * (1 - k)) end
+        end
         return c
     end
 
     # Returns derivative of cost of arc (i,j) at arc flow x (k = A[i]⁻¹(j))
-    function c′ᵢⱼ(i, k, m, x)
+    function c′ᵢⱼ(i, k, m, x, method=assignment)
         #j = A[i][k]
 
         α = αᵢⱼ[i][k]
@@ -203,7 +210,15 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
         if t′ == Inf t′ = 1.0e6 end
 
         c′ = 0.0
-        for k in 1:length(η[m]) c′ += -(length(η[m]) - k - 1) * η[m][k] * v^(length(η[m]) - k) * t′ end
+        if method == :UE for k in 0:(length(η[m])-1) c′ += η[m][k+1] * v^k * (1 - k) * t′ end end
+        if method == :SO
+            t′′ = tₒ * α * β * (β - 1) * (abs(x) ^ (β - 2))/(V ^ β)
+            if β == 0 || β == 1 t′′ = 0.0 end
+            if t′′ == Inf t′′ = 1.0e6 end
+            for k in 0:(length(η[m])-1)
+                c′ += η[m][k+1] * v^k * (1-k) * (2t′ + x*(t′′ - k*(t′^2)/t))
+            end
+        end
         return c′
     end
 
@@ -272,7 +287,7 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
     end
 
     # improved Traffic Assignment with Paired Alterantive Segments
-    function iTAPAS(ϵ, θ, μ, 𝜈)
+    function iTAPAS(ϵ, θ, μ, 𝜈, writeout=true)
         report = Dict("TF" => Float64[], "TC" => Float64[], "RG" => Float64[], "WT" => Float64[])
 
         xʳₐ = Dict(r => [[0.0 for j in A[i]] for i in N] for r in R)                      # Stores origin-based arc flows
@@ -420,6 +435,13 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
             return p
         end
 
+
+        if log == :on
+            print("\n iter: iteration,  RG:Relative Gap,  TF:Total Flow,  TC: Total Cost,  WT: Wall Time (s)")
+            print("\n iter  | logRG      | TF          | TC          | WT (s) ")
+            print("\n ------|------------|-------------|-------------|--------")
+        end
+
         ## Step 0: Intialization - AON assignment
         T =  Dates.format(now(), "HH:MM:SS:sss")
         tₒ = parse.(Int64, [T[1:2], T[4:5], T[7:8], T[10:12]])
@@ -444,34 +466,33 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
             end
         end
 
-        if log == :on
-            print("\n iter: iteration,  RG:Relative Gap,  TF:Total Flow,  TC: Total Cost,  WT: Wall Time (s)")
-            print("\n iter  | logRG      | TF          | TC          | WT (s) ")
-            print("\n ------|------------|-------------|-------------|--------")
-        end
-
         # Iterate
         while true
-            # Run Time calculation
+            # Run Time
             T =  Dates.format(now(), "HH:MM:SS:sss")
             tₙ = parse.(Int64, [T[1:2], T[4:5], T[7:8], T[10:12]])
             wt = sum((tₙ - tₒ) .* [3600, 60, 1, 1/1000])
 
-            # Relative Gap calculation
+            # Relative Gap
             for r in R Lᵣ[r] = djk(cₐ[Mᵣ[r]], r) end
             num , den = 0.0, 0.0
             for r in R for s in Sᵣ[r] num += qᵣ[r,s] * cₑ(path(Lᵣ[r], r, s), cₐ[Mᵣ[r]]) end end
             for r in R for i in N for k in 1:length(A[i]) den += xʳₐ[r][i][k] * cₐ[Mᵣ[r]][i][k] end end end
             rg = 1 - num/den
 
-            # Miscelaneous
+            # Total network flow and cost
+            tf = sum(sum.(xₐ))
+            tc = 0.0
+            for r in R for i in N for k in 1:length(A[i]) tc += xʳₐ[r][i][k] * cᵢⱼ(i, k, Mᵣ[r], xₐ[i][k], :UE) end end end
+
+            # Miscellaneous
             append!(report["RG"], log10(abs(rg)))
-            append!(report["TF"], sum(sum.(xₐ)))
-            append!(report["TC"], den)
+            append!(report["TF"], tf)
+            append!(report["TC"], tc)
             append!(report["WT"], wt)
             if log == :on
-                if iter < 10 @printf("\n #%.0f    | %.3E | %.5E | %.5E | %.3f  ", iter, log10(abs(rg)), sum(sum.(xₐ)), den, wt)
-                else @printf("\n #%.0f   | %.3E | %.5E | %.5E |%.3f ", iter, log10(abs(rg)), sum(sum.(xₐ)), den, wt) end
+                if iter < 10 @printf("\n #%.0f    | %.3E | %.5E | %.5E | %.3f  ", iter, log10(abs(rg)), tf, tc, wt)
+                else @printf("\n #%.0f   | %.3E | %.5E | %.5E |%.3f ", iter, log10(abs(rg)), tf, tc, wt) end
             end
 
             # Convergence Test
@@ -511,16 +532,40 @@ function traffic_assignment(;networkName, tol=1e-5, maxIters=20, maxRunTime=600,
             end
         end
 
-        output = Dict("Flows" => xₐ, "Costs" => cₐ)
-        println("\n Total run time: $wt; Total network flow: $(sum([xʳₐ[r][i][k] * ϕ[i][k] for r in R for i in N for k in 1:length(A[i])])); Total network cost: $(sum([xʳₐ[r][i][k] * cₐ[Mᵣ[r]][i][k]  * ϕ[i][k] for r in R for i in N for k in 1:length(A[i])]))")
-        return output, report
+        # Writing out files
+        if writeout
+            df₁ = DataFrame(from = Int64[], to = Int64[])
+            for m in M df₁[!, Symbol("flow class $m")] = Float64[] end
+            for m in M df₁[!, Symbol("cost class $m")] = Float64[] end
+            for i in N
+                for (k,j) in enumerate(A[i])
+                    if ϕ[i][k] == 1
+                        append!(df₁[!, :from], i)
+                        append!(df₁[!, :to], j)
+                        for m in M
+                            xᵐ = 0.0
+                            for r in R if Mᵣ[r] == m xᵐ += xʳₐ[r][i][k] end end
+                            append!(df₁[!, Symbol("flow class $m")], xᵐ)
+                        end
+                        for m in M append!(df₁[!, Symbol("cost class $m")], cᵢⱼ(i, k, m, xₐ[i][k], :UE)) end
+                    end
+                end
+            end
+            df₂ = DataFrame(ITER = [i for i in 1:length(report["TF"])],
+                            TF = report["TF"], TC = report["TC"],
+                            LOGRG = report["RG"], WT = report["WT"])
+            CSV.write("Network\\$networkName\\output-$assignment.csv", df₁)
+            CSV.write("Network\\$networkName\\report-$assignment.csv", df₂)
+        end
+        println("\n")
+        println("   Total run time: $wt")
+        println("   Total network flow: $(sum([xʳₐ[r][i][k] * ϕ[i][k] for r in R for i in N for k in 1:length(A[i])]))")
+        println("   Total network cost: $(sum([xʳₐ[r][i][k] * cᵢⱼ(i, k, Mᵣ[r], xₐ[i][k], :UE) * ϕ[i][k] for r in R for i in N for k in 1:length(A[i])]))")
+        return
     end
-    build()
-    return iTAPAS(1e-12, 1e-16, 0.5, 0.25)
 
+    build()
+    iTAPAS(1e-12, 1e-16, 0.5, 0.25, true)
 end
 
-traffic_assignment(networkName="Anaheim", tol=1e-12, maxIters=20, maxRunTime=600, log=:on)
-
-# TODO: Combine the results in a post-processing step to render a multi-class solution - SemiDONE
-# TODO: Upload networks in a repository and update repository name in the docstring
+traffic_assignment(networkName="Sample", assignment=:SO, tol=1e-12, maxIters=20, maxRunTime=600, log=:on)
