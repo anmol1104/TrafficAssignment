@@ -25,7 +25,7 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
 -   coef    : Enlists coefficients of p(v) for all the parameters (p) of the generalized cost function
 -   class   : Enlists the relevant subset of parameters for the generalized cost function for each class
 -   network : Details the topology of the network
--   demand  : Enlists OD pairs and corresponding deman
+-   demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
 
 **IO Units**
 -   length  : miles
