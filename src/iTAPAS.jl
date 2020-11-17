@@ -14,12 +14,12 @@ Random.seed!(1403)
     for static multi-class traffic assignment problem with generalized link cost
     function.
 
-    ## Generalized link cost function: c(v) = Σ ℿₚ * p(v) * t
-    -   c(v): generalized link cost for link ij
-    -   t   : travel time on link ij
-    -   v   : travel speed on link ij
-    -   ℿₚ  : cost of parameter p
-    -   p(v): parameter p as a polynomial function of v
+    ## Generalized link cost function: cᵐᵢⱼ = fᵐ(vᵢⱼ) * tᵢⱼ
+    -   cᵐᵢⱼ : generalized link cost for link ij, vehicle class m
+    -   tᵢⱼ  : travel time on link ij
+    -   vᵢⱼ  : travel speed on link ij
+    -   fᵐ(v): a polynomial rate of consumption function on v for vehicle class m
+               (analogous to rate of fuel consumption or rate of pollutant emission)
 
     ## Required properties of the generalized cost function
     -   Strictly positive
@@ -35,9 +35,7 @@ Random.seed!(1403)
     -   log         : presents results for every iteration if log is on
 
     ## DataFiles (available at: https://github.com/anmol1104/TrafficAssignment)
-    -   cost    : Enlists cost (ℿₚ) for all the parameters (p) of the generalized cost function
-    -   coef    : Enlists coefficients of p(v) for all the parameters (p) of the generalized cost function
-    -   class   : Enlists the relevant subset of parameters for the generalized cost function for each class
+    -   class   : Enlists coefficients of fᵐ(v) for each class
     -   network : Details the topology of the network
     -   demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
 
@@ -69,47 +67,26 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
 
 
     function build()
-        # cost file
-        costFile = "Network\\$networkName\\cost.csv"
-        csv₁ = CSV.File(costFile, types=[String, Float64])
-        df₁ = DataFrame(csv₁)
-        parameters = [df₁[i,1] for i in 1:nrow(df₁)]::Array{String,1}
-        ℿ = df₁[!,2]::Array{Float64,1}
-
-        # coef file
-        coefFile = "Network\\$networkName\\coef.csv"
-        csv₂ = CSV.File(coefFile)
-        df₂ = DataFrame(csv₂)
-        γ = [[df₂[i,j] for j in 2:ncol(df₂)] for i in 1:length(parameters)]::Array{Array{Float64,1},1}
-
-        # criteria file
+        # class file
         clssFile = "Network\\$networkName\\class.csv"
-        csv₃ = CSV.File(clssFile, types=[Int64, String])
-        df₃ = DataFrame(csv₃)
-        criteria = [split(df₃[!,2][i], ", ") for i in 1:nrow(df₃)]::Array{Array{SubString{String},1},1}
-        for m in df₃[!,1]::Array{Int64,1}
+        csv₁ = CSV.File(clssFile)
+        df₁ = DataFrame(csv₁)
+        for m in 1:nrow(df₁)
             append!(M,m)
-            push!(η, [])
-            for i in 1:(ncol(df₂)-1)
-                append!(η[end], 0.0)
-                for j in 1:length(parameters)
-                    p = parameters[j]
-                    if p ∈ criteria[m] η[m][i] += γ[j][i] * ℿ[j] end
-                end
-            end
+            push!(η, df₁[m, 2:ncol(df₁)])
         end
 
         # network file
         ntwkFile = "Network\\$networkName\\network.csv"
-        csv₄ = CSV.File(ntwkFile, types=[Int64, Int64, Float64, Float64, Float64, Float64, Float64])
-        df₄ = DataFrame(csv₄)
-        head = df₄[!, 1]::Array{Int64,1}
-        tail = df₄[!, 2]::Array{Int64,1}
-        linkcapacity = df₄[!, 3]::Array{Float64,1}
-        linklength = df₄[!, 4]::Array{Float64,1}
-        linkfft = df₄[!, 5]::Array{Float64,1}
-        alpha = df₄[!, 6]::Array{Float64,1}
-        beta = df₄[!, 7]::Array{Float64,1}
+        csv₂ = CSV.File(ntwkFile, types=[Int64, Int64, Float64, Float64, Float64, Float64, Float64])
+        df₂ = DataFrame(csv₂)
+        head = df₂[!, 1]::Array{Int64,1}
+        tail = df₂[!, 2]::Array{Int64,1}
+        linkcapacity = df₂[!, 3]::Array{Float64,1}
+        linklength = df₂[!, 4]::Array{Float64,1}
+        linkfft = df₂[!, 5]::Array{Float64,1}
+        alpha = df₂[!, 6]::Array{Float64,1}
+        beta = df₂[!, 7]::Array{Float64,1}
         n = max(maximum(head), maximum(tail))
         for i in 1:n
             append!(N, i)
@@ -133,11 +110,11 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
 
         # demand file
         dmndFile = "Network\\$networkName\\demand.csv"
-        csv₅ = CSV.File(dmndFile)
-        df₅ = DataFrame(csv₅)
-        origin = df₅[!, 1]::Array{Int64,1}
-        destination = df₅[!, 2]::Array{Int64,1}
-        flows = df₅[!, 3:ncol(df₅)]::DataFrame
+        csv₃ = CSV.File(dmndFile)
+        df₃ = DataFrame(csv₃)
+        origin = df₃[!, 1]::Array{Int64,1}
+        destination = df₃[!, 2]::Array{Int64,1}
+        flows = df₃[!, 3:ncol(df₃)]::DataFrame
         dict = Dict{Int64,Array{Int64,1}}(r => [r] for r in unique(origin))
         for rₒ in unique(origin)
             for m in 2:length(M)
@@ -153,9 +130,9 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                 append!(dict[rₒ], r)
             end
         end
-        for i in 1:nrow(df₅)
+        for i in 1:nrow(df₃)
             rₒ = origin[i]
-            for j in 1:(ncol(df₅)-2)
+            for j in 1:(ncol(df₃)-2)
                 r, s, m = dict[rₒ][j], destination[i], j
                 if r ∉ R Sᵣ[r] = [] end
                 if r ∉ R append!(R, r) end
@@ -568,4 +545,4 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
     iTAPAS(1e-12, 1e-16, 0.5, 0.25, true)
 end
 
-traffic_assignment(networkName="Sample", assignment=:SO, tol=1e-12, maxIters=20, maxRunTime=600, log=:on)
+traffic_assignment(networkName="Anaheim", assignment=:UE, tol=1e-12, maxIters=20, maxRunTime=600, log=:on)
