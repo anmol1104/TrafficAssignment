@@ -6,6 +6,7 @@ using Printf
 using StatsBase
 using Dates
 Random.seed!(1403)
+cd(@__DIR__)
 
 @doc "
     traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
