@@ -1,13 +1,13 @@
 # TrafficAssignment
 improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm for static multi-class traffic assignment problem with generalized link cost function.
 
-**Generalized link cost function: c(v) = Σ ℿₚ * p(v) * t**
--   c(v): generalized link cost for link ij
--   t   : travel time on link ij
--   v   : travel speed on link ij
--   ℿₚ  : cost of parameter p
--   p(v): parameter p as a polynomial function of v
-
+**Generalized link cost function: cᵐᵢⱼ = fᵐ(vᵢⱼ) * tᵢⱼ**
+-   cᵐᵢⱼ : generalized link cost for link ij, vehicle class m
+-   tᵢⱼ  : travel time on link ij
+-   vᵢⱼ  : travel speed on link ij
+-   fᵐ(v): a polynomial rate of consumption function on v for vehicle class m
+           (analogous to rate of fuel consumption or rate of pollutant emission)
+           
 **Required properties of the generalized cost function**
 -   Strictly positive
 -   Monotonically non-decreasing
@@ -21,9 +21,7 @@ improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm fo
 -   log         : presents results for every iteration if log is on
 
 **DataFiles** (available at: https://github.com/anmol1104/TrafficAssignment/tree/main/src/Network)
--   cost    : Enlists cost (ℿₚ) for all the parameters (p) of the generalized cost function
--   coef    : Enlists coefficients of p(v) for all the parameters (p) of the generalized cost function
--   class   : Enlists the relevant subset of parameters for the generalized cost function for each class
+-   class   : Enlists coefficients of fᵐ(v) for each class
 -   network : Details the topology of the network
 -   demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
 
