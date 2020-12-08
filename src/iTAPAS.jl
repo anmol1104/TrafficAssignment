@@ -265,7 +265,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
     end
 
     # improved Traffic Assignment with Paired Alterantive Segments
-    function iTAPAS(ϵ, θ, μ, 𝜈, writeout=true)
+    function iTAPAS(ϵ, θ, writeout=true)
         report = Dict("TF" => Float64[], "TC" => Float64[], "RG" => Float64[], "WT" => Float64[])
 
         xʳₐ = Dict(r => [[0.0 for j in A[i]] for i in N] for r in R)                      # Stores origin-based arc flows
@@ -543,7 +543,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
     end
 
     build()
-    iTAPAS(1e-12, 1e-16, 0.5, 0.25, true)
+    iTAPAS(1e-12, 1e-16, true)
 end
 
 traffic_assignment(networkName="Anaheim", assignment=:UE, tol=1e-12, maxIters=20, maxRunTime=600, log=:on)
