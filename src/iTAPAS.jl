@@ -5,52 +5,52 @@ using Calculus
 using Printf
 using StatsBase
 using Dates
+using JLD
 Random.seed!(1403)
 cd(@__DIR__)
 
-@doc "
-    traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
+"""
+    traffic_assignment(;networkName[, assignment, initialSol, tol, maxIters, maxRunTime, log])
 
-    improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm
-    for static multi-class traffic assignment problem with generalized link cost
-    function.
+improved Traffic Assignment by Paired Alternative Segments (iTAPAS) algorithm for static multi-class 
+traffic assignment problem with generalized link cost function.
+ 
+### Generalized link cost function: `cᵐᵢⱼ = fᵐ(vᵢⱼ)tᵢⱼ`
+- `cᵐᵢⱼ` : generalized link cost for link 𝑖𝑗 , vehicle class 𝑚
+- `tᵢⱼ`  : travel time on link 𝑖𝑗
+- `vᵢⱼ`  : travel speed on link 𝑖𝑗
+- `fᵐ(v)`: rate function (\$ per hr) for vehicle class 𝑚, `fᵐ(v) = ∑ₖ ηᵏvᵏ`
 
-    ## Generalized link cost function: cᵐᵢⱼ = fᵐ(vᵢⱼ) * tᵢⱼ
-    -   cᵐᵢⱼ : generalized link cost for link ij, vehicle class m
-    -   tᵢⱼ  : travel time on link ij
-    -   vᵢⱼ  : travel speed on link ij
-    -   fᵐ(v): a polynomial rate of consumption function on v for vehicle class m
-               (analogous to rate of fuel consumption or rate of pollutant emission)
+### Required properties of the generalized cost function
+- Strictly positive
+- Monotonically non-decreasing
+- Continuously differentiable
 
-    ## Required properties of the generalized cost function
-    -   Strictly positive
-    -   Monotonically non-decreasing
-    -   COntinuously differentiable
+### Arguments
+- `networkName`::String         : network from the repository https://github.com/anmol1104/TrafficAssignment
+- `assignment`::Symbol=:UE      : User Equilibrium (UE) or System Optimal (SO) assigment
+- `tol`::Float=1e-5             : tolerance level for relative gap convergence
+- `maxIters`::Integer=20        : maximum number of iterations
+- `maxRunTime`::Integer=600     : maximum wall clock run time (s)
+- `log`::Symbol=:on             : shows results for every iteration if log is on
 
-    ## Arguments
-    -   networkName : network from the repository https://github.com/anmol1104/TrafficAssignment
-    -   assignment  : User Equilibrium (UE) or System Optimal (SO) assigment
-    -   tol         : tolerance level for relative gap convergence
-    -   maxIters    : maximum number of iterations
-    -   maxRunTime  : maximum wall clock run time (s)
-    -   log         : presents results for every iteration if log is on
+### DataFiles (available at: https://github.com/anmol1104/TrafficAssignment)
+- class   : Enlists coefficients of `fᵐ(v)` for each class
+- network : Details the topology of the network
+- demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
 
-    ## DataFiles (available at: https://github.com/anmol1104/TrafficAssignment)
-    -   class   : Enlists coefficients of fᵐ(v) for each class
-    -   network : Details the topology of the network
-    -   demand  : Enlists OD pairs and corresponding demand for each class in passenger car equivalent (PCE)
-
-    ## IO Units
-    -   length  : miles
-    -   time    : hour
-    -   volume  : litre
-    -   mass    : kg
-    -   cost    : \$
-"
+### IO Units
+- length  : miles
+- time    : hour
+- volume  : litre
+- mass    : kg
+- cost    : \$
+"""
 function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20, maxRunTime=600, log=:on)
     println()
     printstyled("\niTAPAS Algorithm", color=:blue)
 
+    # Algorithm parameters
     N   = Int64[]                               # Nodes
     A   = Array{Int64,1}[]                      # Arcs as adjacency list
     M   = Int64[]                               # Modes/classes
@@ -63,18 +63,21 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
     Mᵣ  = Dict{Int64,Int64}()                   # Mode/class assosciated with every origin
     Sᵣ  = Dict{Int64,Array{Int64,1}}()          # Destinations for every origin
     qᵣ  = Dict{Tuple{Int64,Int64},Float64}()    # Demand between OD pairs
-    η   = Array{Float64,1}[]                    # Effective coeffficients for the polynomial c(v) = Σ ℿₚ * p(v) * t
+    η   = Array{Float64,1}[]                    # Coefficients for the polynomial fᵐ(v)
+
     ϕ   = Array{Int64,1}[]
+    γ   = Array{Array{Int64,1},1}[]
 
-
+    # Network build
+    # Fetches betwork files and builds network related vectors
     function build()
         # class file
         clssFile = "Network\\$networkName\\class.csv"
         csv₁ = CSV.File(clssFile)
         df₁ = DataFrame(csv₁)
         for m in 1:nrow(df₁)
-            append!(M,m)
-            push!(η, df₁[m, 2:ncol(df₁)])
+            push!(M,m)
+            push!(η, [df₁[m, c] for c in 2:ncol(df₁)])
         end
 
         # network file
@@ -90,7 +93,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
         beta = df₂[!, 7]::Array{Float64,1}
         n = max(maximum(head), maximum(tail))
         for i in 1:n
-            append!(N, i)
+            push!(N, i)
             push!(A, [])
             push!(Vᵢⱼ, [])
             push!(dᵢⱼ, [])
@@ -100,52 +103,70 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             push!(ϕ, [])
         end
         for i in 1:length(head)
-            append!(A[head[i]], tail[i])
-            append!(Vᵢⱼ[head[i]], linkcapacity[i])
-            append!(dᵢⱼ[head[i]], linklength[i])
-            append!(tᵢⱼ[head[i]], linkfft[i])
-            append!(αᵢⱼ[head[i]], alpha[i])
-            append!(βᵢⱼ[head[i]], beta[i])
-            append!(ϕ[head[i]], 1)
+            push!(A[head[i]], tail[i])
+            push!(Vᵢⱼ[head[i]], linkcapacity[i])
+            push!(dᵢⱼ[head[i]], linklength[i])
+            push!(tᵢⱼ[head[i]], linkfft[i])
+            push!(αᵢⱼ[head[i]], alpha[i])
+            push!(βᵢⱼ[head[i]], beta[i])
+            push!(ϕ[head[i]], 1)
+        end
+
+        # geofencing file
+        if "geofence.csv" ∈ readdir("Network\\$networkName\\")
+            geofFile = "Network\\$networkName\\geofence.csv"
+            csv₃ = CSV.File(geofFile)
+            df₃ = DataFrame(csv₃)
+            for m in M
+                push!(γ, [[] for i in N])
+                for r in 1:nrow(df₃)
+                    i = df₃[r,1]::Int64
+                    push!(γ[m][i], df₃[r,m+2])
+                end
+            end
+        else
+            for m in M push!(γ, [[0 for j in A[i]] for i in N]) end
         end
 
         # demand file
         dmndFile = "Network\\$networkName\\demand.csv"
-        csv₃ = CSV.File(dmndFile)
-        df₃ = DataFrame(csv₃)
-        origin = df₃[!, 1]::Array{Int64,1}
-        destination = df₃[!, 2]::Array{Int64,1}
-        flows = df₃[!, 3:ncol(df₃)]::DataFrame
+        csv₄ = CSV.File(dmndFile)
+        df₄ = DataFrame(csv₄)
+        origin = df₄[!, 1]::Array{Int64,1}
+        destination = df₄[!, 2]::Array{Int64,1}
+        flows = df₄[!, 3:ncol(df₄)]::DataFrame
         dict = Dict{Int64,Array{Int64,1}}(r => [r] for r in unique(origin))
-        for rₒ in unique(origin)
-            for m in 2:length(M)
+        for m in 2:length(M)
+            for rₒ in unique(origin)
                 r = length(N) + 1
-                append!(N, r)
-                append!(A[rₒ], r), push!(A, [rₒ])
-                append!(Vᵢⱼ[rₒ], 1.0), push!(Vᵢⱼ, [1.0])
-                append!(dᵢⱼ[rₒ], 0.0), push!(dᵢⱼ, [0.0])
-                append!(tᵢⱼ[rₒ], 0.001), push!(tᵢⱼ, [0.001])
-                append!(αᵢⱼ[rₒ], 0.0), push!(αᵢⱼ, [0.0])
-                append!(βᵢⱼ[rₒ], 0.0), push!(βᵢⱼ, [0.0])
-                append!(ϕ[rₒ], 0), push!(ϕ, [0])
-                append!(dict[rₒ], r)
+                push!(N, r)
+                push!(A[rₒ], r), push!(A, [rₒ])
+                push!(Vᵢⱼ[rₒ], 1.0), push!(Vᵢⱼ, [1.0])
+                push!(dᵢⱼ[rₒ], 0.0), push!(dᵢⱼ, [0.0])
+                push!(tᵢⱼ[rₒ], 0.001), push!(tᵢⱼ, [0.001])
+                push!(αᵢⱼ[rₒ], 0.0), push!(αᵢⱼ, [0.0])
+                push!(βᵢⱼ[rₒ], 0.0), push!(βᵢⱼ, [0.0])
+                push!(ϕ[rₒ], 0), push!(ϕ, [0])
+                push!(dict[rₒ], r)
+                for k in M push!(γ[k][rₒ], 0), push!(γ[k], [0]) end
             end
         end
-        for i in 1:nrow(df₃)
+        for i in 1:nrow(df₄)
             rₒ = origin[i]
-            for j in 1:(ncol(df₃)-2)
+            for j in 1:(ncol(df₄)-2)
                 r, s, m = dict[rₒ][j], destination[i], j
                 if r ∉ R Sᵣ[r] = [] end
-                if r ∉ R append!(R, r) end
-                append!(Sᵣ[r], s)
+                if r ∉ R push!(R, r) end
+                push!(Sᵣ[r], s)
                 Mᵣ[r] = m
                 qᵣ[(r,s)] = flows[i,j]
             end
         end
     end
 
+    # Arc cost
     # Returns cost of arc (i,j) for class m given arc flow x (k = A[i]⁻¹(j))
-    function cᵢⱼ(i, k, m, x, method=assignment)
+    function cᵢⱼ(i, k, m, x, method)
         #j = A[i][k]
 
         α = αᵢⱼ[i][k]
@@ -166,11 +187,13 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             if t′ == Inf t′ = 1.0e6 end
             for k in 0:(length(η[m])-1) c += η[m][k+1] * v^k * (t + x * t′ * (1 - k)) end
         end
+        c = c * (1 + γ[m][i][k]*(1))
         return c
     end
 
+    # Arc cost derivative
     # Returns derivative of cost of arc (i,j) at arc flow x (k = A[i]⁻¹(j))
-    function c′ᵢⱼ(i, k, m, x, method=assignment)
+    function c′ᵢⱼ(i, k, m, x, method)
         #j = A[i][k]
 
         α = αᵢⱼ[i][k]
@@ -197,9 +220,11 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                 c′ += η[m][k+1] * v^k * (1-k) * (2t′ + x*(t′′ - k*(t′^2)/t))
             end
         end
+        c′ = c′ * (1 + γ[m][i][k]*(1))
         return c′
     end
 
+    # Segment cost
     # Returns cost for segment e given arc flows xₐ and arc costs c
     function cₑ(e, cₐ)
         c = 0.0
@@ -211,21 +236,23 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
         return c
     end
 
+    # Segment flow
     # Returns flow on segment e given arc flows xₐ
     function fₑ(e, xₐ)
-        f = Float64[]
+        f = zeros(length(e)-1)
         for (n,i) in enumerate(e[1:end-1])
             j = e[n+1]
             k = findfirst(x -> (x == j), A[i])::Int64
-            append!(f, xₐ[i][k])
+            f[n] = xₐ[i][k]
         end
         return minimum(f)
     end
 
+    # Djikstra's label setting algorithm
     # Returns predecessor label L for every node i for least cost path from node r given arc costs cₐ
     function djk(cₐ, r)
-        L = [if i==r r else -1 end for i in N]         # Predecessor label
-        C = [if i==r 0.0 else Inf end for i in N]      # Cost label
+        L = [if i == r r else -1 end for i in N]       # Predecessor label
+        C = [if i == r 0.0 else Inf end for i in N]    # Cost label
         X = copy(N)                                    # Set of open nodes
         i = r
         deleteat!(X, i)
@@ -241,44 +268,44 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
         return L
     end
 
+    # Tree
     # Returns tree rooted at r given predecessor label L
     function tree(L, r)
         T = Array{Int64,1}[[] for j in N]
         for j in N
             i = L[j]
-            if i ≠ j && i ≠ -1 append!(T[i], j) end
+            if i ≠ j && i ≠ -1 push!(T[i], j) end
         end
         return T
     end
 
+    # Path
     # Returns path between node r and s using predecessor label L
     function path(L, r, s)
         p = Int64[]
         i = s
-        append!(p, i)
+        push!(p, i)
         while i ≠ r
             i = Int(L[i])
-            append!(p, i)
+            push!(p, i)
         end
         reverse!(p)
         return p
     end
 
-    # improved Traffic Assignment with Paired Alterantive Segments
-    function iTAPAS(ϵ, θ, writeout=true)
+    # improved Traffic Assignment with Paired Alterantive Segments (iTAPAS)
+    # Returns excel file with arc flows and arc cost for each class, and a log of iterations
+    function iTAPAS(ϵ, θ, writeout)
         report = Dict("TF" => Float64[], "TC" => Float64[], "RG" => Float64[], "WT" => Float64[])
 
-        xʳₐ = Dict(r => [[0.0 for j in A[i]] for i in N] for r in R)                      # Stores origin-based arc flows
-        xₐ  = [[sum([xʳₐ[r][i][k] for r in R]) for k in 1:length(A[i])] for i in N]       # Stores arc flows
-
-        cₐ  = [[[cᵢⱼ(i, k, m, xₐ[i][k]) for k in 1:length(A[i])] for i in N] for m in M]     # Stores arc cost
-        c′ₐ = [[[c′ᵢⱼ(i, k, m, xₐ[i][k]) for k in 1:length(A[i])] for i in N] for m in M]    # Stores derivative of arc cost
-        πʳₐ = Dict(r => [[0.0 for j in A[i]] for i in N] for r in R)                         # Stores arc reduced cost
-
-        rₚ = Int64[]                                                                        # Stores origin for PAS p
-        P = Tuple{Array{Int64,1},Array{Int64,1}}[]                                          # Stores PAS
-
-        Lᵣ = Dict(r => [if i==r r else -1 end for i in N] for r in R)                      # Stores origin-based least cost lables
+        xʳₐ = Dict(r => [[0.0 for j in A[i]] for i in N] for r in R)                                     # Stores origin-based arc flows
+        xₐ  = [[sum([xʳₐ[r][i][k] for r in R]) for k in 1:length(A[i])] for i in N]                      # Stores arc flows
+        cₐ  = [[[cᵢⱼ(i, k, m, xₐ[i][k], assignment) for k in 1:length(A[i])] for i in N] for m in M]     # Stores arc cost
+        c′ₐ = [[[c′ᵢⱼ(i, k, m, xₐ[i][k], assignment) for k in 1:length(A[i])] for i in N] for m in M]    # Stores derivative of arc cost
+        πʳₐ = Dict(r => [[0.0 for j in A[i]] for i in N] for r in R)                                     # Stores arc reduced cost
+        rₚ = Int64[]                                                                                      # Stores origin for PAS p
+        P = Tuple{Array{Int64,1},Array{Int64,1}}[]                                                       # Stores PAS
+        Lᵣ = Dict(r => [if i==r r else -1 end for i in N] for r in R)                                    # Stores origin-based least cost lables
 
         # Checks if arc a fails reduced cost optimal conditions for origin r
         function ispotential(a, r)
@@ -305,8 +332,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             else return false end
         end
 
-        #= Shifts flows from higher cost segment to lower cost segment of PAS p
-        on its assosciated origin rₒ, given cost difference is greater than λ=#
+        # Shifts flows from higher cost segment to lower cost segment of PAS p 
+        # on its assosciated origin rₒ, given cost difference is greater than λ
         function shift(p, rₒ, λ)
             e₁, e₂ = p
             m = Mᵣ[rₒ]
@@ -327,8 +354,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                 xʳₐ[rₒ][i][k] += δ
                 xₐ[i][k] += δ
                 for m in M
-                    cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k])
-                    c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k])
+                    cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k], assignment)
+                    c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k], assignment)
                 end
             end
             for (n,i) in enumerate(e₂[1:end-1])
@@ -337,8 +364,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                 xʳₐ[rₒ][i][k] -= δ
                 xₐ[i][k] -= δ
                 for m in M
-                    cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k])
-                    c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k])
+                    cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k], assignment)
+                    c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k], assignment)
                 end
             end
         end
@@ -354,7 +381,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
 
             while flag
                 # Intialize
-                lₖ = [if k ∉ pᵣⱼ 0 elseif k ∈ a 1 else -1 end for k in N]
+                lₖ = [if k ∈ a 1 elseif k ∉ pᵣⱼ 0 else -1 end for k in N]
                 L = [if k == j i else -1 end for k in N]
 
                 # Iterate
@@ -368,7 +395,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                         if k != nothing
                             x = xʳₐ[r][i][k]
                             m = Mᵣ[r]
-                            c = cᵢⱼ(i, k, m, x)
+                            c = cᵢⱼ(i, k, m, x, assignment)
                             if x > ϵ && c > f
                                 f, t = c, i
                             end
@@ -389,7 +416,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                             if h == t pₕₜ = Int64[]
                             else
                                 pₕₜ = path(L, h, t)
-                                append!(pₕₜ, h)
+                                push!(pₕₜ, h)
                                 δ = fₑ(pₕₜ, xʳₐ[r])
                             end
                             for (n,i) in enumerate(pₕₜ[1:end-1])
@@ -397,8 +424,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                                 xʳₐ[r][i][k] -= δ
                                 xₐ[i][k] -= δ
                                 for m in M
-                                    cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k])
-                                    c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k])
+                                    cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k], assignment)
+                                    c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k], assignment)
                                 end
                             end
                             depth += 1
@@ -437,8 +464,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
                     xʳₐ[r][i][k] += qᵣₛ
                     xₐ[i][k] += qᵣₛ
                     for m in M
-                        cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k])
-                        c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k])
+                        cₐ[m][i][k] = cᵢⱼ(i, k, m, xₐ[i][k], assignment)
+                        c′ₐ[m][i][k] = c′ᵢⱼ(i, k, m, xₐ[i][k], assignment)
                     end
                 end
             end
@@ -453,7 +480,7 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
 
             # Relative Gap
             for r in R Lᵣ[r] = djk(cₐ[Mᵣ[r]], r) end
-            num , den = 0.0, 0.0
+            num, den = 0.0, 0.0
             for r in R for s in Sᵣ[r] num += qᵣ[r,s] * cₑ(path(Lᵣ[r], r, s), cₐ[Mᵣ[r]]) end end
             for r in R for i in N for k in 1:length(A[i]) den += xʳₐ[r][i][k] * cₐ[Mᵣ[r]][i][k] end end end
             rg = 1 - num/den
@@ -518,14 +545,14 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
             for i in N
                 for (k,j) in enumerate(A[i])
                     if ϕ[i][k] == 1
-                        append!(df₁[!, :from], i)
-                        append!(df₁[!, :to], j)
+                        push!(df₁[!, :from], i)
+                        push!(df₁[!, :to], j)
                         for m in M
                             xᵐ = 0.0
                             for r in R if Mᵣ[r] == m xᵐ += xʳₐ[r][i][k] end end
-                            append!(df₁[!, Symbol("flow class $m")], xᵐ)
+                            push!(df₁[!, Symbol("flow class $m")], xᵐ)
                         end
-                        for m in M append!(df₁[!, Symbol("cost class $m")], cᵢⱼ(i, k, m, xₐ[i][k], :UE)) end
+                        for m in M push!(df₁[!, Symbol("cost class $m")], cᵢⱼ(i, k, m, xₐ[i][k], :UE)) end
                     end
                 end
             end
@@ -545,5 +572,8 @@ function traffic_assignment(;networkName, assignment=:UE, tol=1e-5, maxIters=20,
     build()
     iTAPAS(1e-12, 1e-16, true)
 end
+# ────────────────────────────────────────────────────────────────────────────────
 
-traffic_assignment(networkName="Anaheim", assignment=:UE, tol=1e-12, maxIters=20, maxRunTime=600, log=:on)
+traffic_assignment(networkName = "SCAG")
+    
+# TODO: Test against benchmarks from Xie, Nie and Liu (2018) - A greedy path based algorithm
